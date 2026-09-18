@@ -1,0 +1,37 @@
+@model PropertyRental.Web.ViewModels.Units.UnitListViewModel
+
+@{
+    ViewData["Title"] = "Available units";
+}
+
+<div class="mb-4">
+    <h1 class="h2 mb-1">Available units</h1>
+    <p class="text-body-secondary mb-0">Explore units that do not have an active lease today.</p>
+</div>
+
+@if (Model.Units.Count == 0)
+{
+    <div class="alert alert-light border" role="status">There are no available units right now.</div>
+}
+else
+{
+    <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
+    @foreach (var unit in Model.Units)
+    {
+        <div class="col">
+            <article class="card h-100 shadow-sm">
+                <div class="card-body d-flex flex-column">
+                    <p class="text-body-secondary mb-1">@unit.PropertyName</p>
+                    <h2 class="h5">Unit @unit.UnitNumber</h2>
+                    <dl class="row small mb-4">
+                        <dt class="col-6">Type</dt><dd class="col-6">@unit.UnitTypeName</dd>
+                        <dt class="col-6">Bedrooms</dt><dd class="col-6">@unit.Bedrooms</dd>
+                        <dt class="col-6">Monthly rent</dt><dd class="col-6">@unit.MonthlyRent.ToString("C")</dd>
+                    </dl>
+                    <a asp-action="Details" asp-route-id="@unit.Id" class="btn btn-outline-primary mt-auto">View details</a>
+                </div>
+            </article>
+        </div>
+    }
+    </div>
+}

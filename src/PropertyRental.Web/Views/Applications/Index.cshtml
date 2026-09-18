@@ -1,0 +1,85 @@
+@using PropertyRental.Web.Models.Enums
+@model PropertyRental.Web.ViewModels.Applications.ApplicationListViewModel
+
+@{
+    ViewData["Title"] = "Applications";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+        <h1 class="h2 mb-1">@(Model.IsManager ? "Rental applications" : "My applications")</h1>
+        <p class="text-body-secondary mb-0">@(Model.IsManager ? "Review applications across your portfolio." : "Track the status of your rental applications.")</p>
+    </div>
+</div>
+
+@if (Model.IsManager)
+{
+    <form method="get" class="row g-2 align-items-end mb-4">
+        <div class="col-sm-6 col-md-4">
+            <label for="status" class="form-label">Status</label>
+            <select id="status" name="status" class="form-select">
+                <option value="">All statuses</option>
+                @foreach (var status in Enum.GetValues<RentalApplicationStatus>())
+                {
+                    <option value="@status" selected="@(status == Model.Filter.Status)">@status</option>
+                }
+            </select>
+        </div>
+        <div class="col-sm-6 col-md-4">
+            <label for="propertyId" class="form-label">Property</label>
+            <select id="propertyId" name="propertyId" class="form-select">
+                <option value="">All properties</option>
+                @foreach (var property in Model.Properties)
+                {
+                    <option value="@property.Id" selected="@(property.Id == Model.Filter.PropertyId)">@property.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-outline-secondary">Filter</button>
+        </div>
+    </form>
+}
+
+@if (Model.Applications.Count == 0)
+{
+    <div class="alert alert-light border" role="status">
+        @(Model.IsManager ? "No applications match the selected filters." : "You have not started an application yet. Browse available units to get started.")
+    </div>
+}
+else
+{
+    <div class="table-responsive border rounded">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    @if (Model.IsManager)
+                    {
+                        <th scope="col">Applicant</th>
+                    }
+                    <th scope="col">Property</th>
+                    <th scope="col">Unit</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Last updated</th>
+                    <th scope="col" class="text-end">Details</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var application in Model.Applications)
+            {
+                <tr>
+                    @if (Model.IsManager)
+                    {
+                        <td>@application.ApplicantName</td>
+                    }
+                    <td class="fw-semibold">@application.PropertyName</td>
+                    <td>@application.UnitNumber</td>
+                    <td><span class="badge text-bg-secondary">@application.Status</span></td>
+                    <td>@application.UpdatedAtUtc.ToLocalTime().ToString("g")</td>
+                    <td class="text-end"><a asp-action="Details" asp-route-id="@application.Id" class="btn btn-sm btn-outline-primary">View</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}

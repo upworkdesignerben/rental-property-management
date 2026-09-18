@@ -1,0 +1,145 @@
+@model PropertyRental.Web.ViewModels.Applications.ApplicationDetailsViewModel
+
+@{
+    ViewData["Title"] = $"Application #{Model.Id}";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+        <a asp-action="Index" class="text-decoration-none">Back to applications</a>
+        <h1 class="h2 mt-2 mb-1">Application #@Model.Id</h1>
+        <p class="text-body-secondary mb-0">Submitted @Model.CreatedAtUtc.ToLocalTime().ToString("g")</p>
+    </div>
+    <span class="badge text-bg-secondary fs-6">@Model.Status</span>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.ReturnComment))
+{
+    <div class="alert alert-warning"><strong>Action requested:</strong> @Model.ReturnComment</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <section class="card shadow-sm h-100">
+            <div class="card-body">
+                <h2 class="h5">Requested unit</h2>
+                <dl class="row mb-0">
+                    <dt class="col-sm-5">Property</dt><dd class="col-sm-7">@Model.PropertyName</dd>
+                    <dt class="col-sm-5">Address</dt><dd class="col-sm-7">@Model.PropertyAddress</dd>
+                    <dt class="col-sm-5">Unit</dt><dd class="col-sm-7">@Model.UnitNumber (@Model.UnitTypeName)</dd>
+                    <dt class="col-sm-5">Bedrooms</dt><dd class="col-sm-7">@Model.Bedrooms</dd>
+                    <dt class="col-sm-5">Monthly rent</dt><dd class="col-sm-7">@Model.MonthlyRent.ToString("C")</dd>
+                </dl>
+            </div>
+        </section>
+    </div>
+    <div class="col-lg-5">
+        <section class="card shadow-sm h-100">
+            <div class="card-body">
+                <h2 class="h5">Lease</h2>
+                @if (Model.LeaseStartDate.HasValue)
+                {
+                    <p class="mb-0">@Model.LeaseStartDate.Value.ToString("d") to @Model.LeaseEndDate!.Value.ToString("d")</p>
+                }
+                else
+                {
+                    <p class="text-body-secondary mb-0">No lease has been created.</p>
+                }
+            </div>
+        </section>
+    </div>
+
+    <div class="col-12">
+        <section class="card shadow-sm">
+            <div class="card-body">
+                <h2 class="h5">Applicant information</h2>
+                @if (Model.ApplicantName is null)
+                {
+                    <p class="text-body-secondary mb-0">This information has not been completed yet.</p>
+                }
+                else
+                {
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3">Name</dt><dd class="col-sm-9">@Model.ApplicantName</dd>
+                        <dt class="col-sm-3">Phone</dt><dd class="col-sm-9">@Model.ApplicantPhone</dd>
+                        <dt class="col-sm-3">Email</dt><dd class="col-sm-9">@Model.ApplicantEmail</dd>
+                        <dt class="col-sm-3">Address</dt><dd class="col-sm-9">@Model.CurrentAddress</dd>
+                    </dl>
+                }
+            </div>
+        </section>
+    </div>
+
+    <div class="col-12">
+        <section class="card shadow-sm">
+            <div class="card-body">
+                <h2 class="h5">Residence history</h2>
+                @if (Model.Residences.Count == 0)
+                {
+                    <p class="text-body-secondary mb-0">No residence history has been provided.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead><tr><th>Address</th><th>Landlord</th><th>Dates</th></tr></thead>
+                            <tbody>
+                            @foreach (var residence in Model.Residences)
+                            {
+                                <tr><td>@residence.Address</td><td>@residence.LandlordName<br /><span class="text-body-secondary">@residence.LandlordPhone</span></td><td>@residence.MoveInDate.ToString("d") to @residence.MoveOutDate.ToString("d")</td></tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </section>
+    </div>
+
+    @if (Model.IsManager)
+    {
+        <div class="col-12">
+            <section class="card shadow-sm">
+                <div class="card-body">
+                    <h2 class="h5">Status history</h2>
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead><tr><th>Changed</th><th>Transition</th><th>By</th><th>Comment</th></tr></thead>
+                            <tbody>
+                            @foreach (var history in Model.StatusHistory)
+                            {
+                                <tr><td>@history.CreatedAtUtc.ToLocalTime().ToString("g")</td><td>@(history.PreviousStatus?.ToString() ?? "New") to @history.NewStatus</td><td>@history.ChangedBy</td><td>@history.Comment</td></tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </div>
+        <div class="col-12">
+            <section class="card shadow-sm">
+                <div class="card-body">
+                    <h2 class="h5">Reviews</h2>
+                    @if (Model.Reviews.Count == 0)
+                    {
+                        <p class="text-body-secondary mb-0">No manager review has been recorded.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead><tr><th>Outcome</th><th>Reviewer</th><th>Comment</th><th>Created</th></tr></thead>
+                                <tbody>
+                                @foreach (var review in Model.Reviews)
+                                {
+                                    <tr><td>@review.Outcome</td><td>@review.ReviewerEmail</td><td>@review.Comment</td><td>@review.CreatedAtUtc.ToLocalTime().ToString("g")</td></tr>
+                                }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </section>
+        </div>
+    }
+</div>

@@ -23,6 +23,8 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 builder.Services.AddControllersWithViews();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IPropertyService, PropertyService>();
+builder.Services.AddScoped<IUnitService, UnitService>();
+builder.Services.AddScoped<IApplicationService, ApplicationService>();
 
 var app = builder.Build();
 

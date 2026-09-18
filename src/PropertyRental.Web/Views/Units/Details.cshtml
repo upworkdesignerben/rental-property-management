@@ -1,0 +1,24 @@
+@model PropertyRental.Web.ViewModels.Units.UnitDetailsViewModel
+
+@{
+    ViewData["Title"] = $"Unit {Model.UnitNumber}";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <a asp-action="Available" class="text-decoration-none">Back to available units</a>
+        <div class="card shadow-sm mt-3">
+            <div class="card-body p-md-4">
+                <p class="text-body-secondary mb-1">@Model.PropertyName</p>
+                <h1 class="h2">Unit @Model.UnitNumber</h1>
+                <p class="text-body-secondary">@Model.PropertyAddress</p>
+                <dl class="row mb-4">
+                    <dt class="col-sm-4">Unit type</dt><dd class="col-sm-8">@Model.UnitTypeName</dd>
+                    <dt class="col-sm-4">Bedrooms</dt><dd class="col-sm-8">@Model.Bedrooms</dd>
+                    <dt class="col-sm-4">Monthly rent</dt><dd class="col-sm-8">@Model.MonthlyRent.ToString("C")</dd>
+                </dl>
+                <button type="button" class="btn btn-primary" disabled>Create application (coming soon)</button>
+            </div>
+        </div>
+    </div>
+</div>
