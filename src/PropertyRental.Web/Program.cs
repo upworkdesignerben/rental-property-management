@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PropertyRental.Web.Data;
 using PropertyRental.Web.Models;
+using PropertyRental.Web.Services;
+using PropertyRental.Web.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +22,7 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
     .AddEntityFrameworkStores<ApplicationDbContext>();
 builder.Services.AddControllersWithViews();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<IPropertyService, PropertyService>();
 
 var app = builder.Build();
 
