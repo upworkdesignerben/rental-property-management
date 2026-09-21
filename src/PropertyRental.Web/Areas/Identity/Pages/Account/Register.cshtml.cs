@@ -71,7 +71,7 @@ public class RegisterModel(
         logger.LogInformation("A user created a new account with the {Role} role.", Input.Role);
         await signInManager.SignInAsync(user, isPersistent: false);
 
-        return LocalRedirect(returnUrl);
+        return LocalRedirect(Url.IsLocalUrl(returnUrl) ? returnUrl : Url.Content("~/"));
     }
 
     private void AddErrors(IdentityResult result)
