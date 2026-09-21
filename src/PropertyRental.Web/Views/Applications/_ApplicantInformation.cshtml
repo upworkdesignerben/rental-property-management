@@ -1,0 +1,18 @@
+@model PropertyRental.Web.ViewModels.Applications.ApplicantInformationViewModel
+<h2 class="h5">Applicant information</h2>
+@if (Model.IsReadOnly)
+{
+    <dl class="row">
+        <dt class="col-sm-3">Name</dt><dd class="col-sm-9">@Model.Name</dd>
+        <dt class="col-sm-3">Phone</dt><dd class="col-sm-9">@Model.Phone</dd>
+        <dt class="col-sm-3">Email</dt><dd class="col-sm-9">@Model.Email</dd>
+        <dt class="col-sm-3">Current address</dt><dd class="col-sm-9">@Model.CurrentAddress</dd>
+    </dl>
+}
+else
+{
+    <div class="mb-3"><label asp-for="Name" class="form-label"></label><input asp-for="Name" class="form-control" autocomplete="name" /><span asp-validation-for="Name" class="text-danger"></span></div>
+    <div class="mb-3"><label asp-for="Phone" class="form-label"></label><input asp-for="Phone" class="form-control" autocomplete="tel" /><span asp-validation-for="Phone" class="text-danger"></span></div>
+    <div class="mb-3"><label asp-for="Email" class="form-label"></label><input asp-for="Email" class="form-control" autocomplete="email" /><span asp-validation-for="Email" class="text-danger"></span></div>
+    <div class="mb-3"><label asp-for="CurrentAddress" class="form-label"></label><input asp-for="CurrentAddress" class="form-control" autocomplete="street-address" /><span asp-validation-for="CurrentAddress" class="text-danger"></span></div>
+}

@@ -1,3 +1,4 @@
+@using PropertyRental.Web.Models.Enums
 @model PropertyRental.Web.ViewModels.Applications.ApplicationDetailsViewModel
 
 @{
@@ -8,9 +9,24 @@
     <div>
         <a asp-action="Index" class="text-decoration-none">Back to applications</a>
         <h1 class="h2 mt-2 mb-1">Application #@Model.Id</h1>
-        <p class="text-body-secondary mb-0">Submitted @Model.CreatedAtUtc.ToLocalTime().ToString("g")</p>
+        <p class="text-body-secondary mb-0">Created @Model.CreatedAtUtc.ToLocalTime().ToString("g")</p>
     </div>
-    <span class="badge text-bg-secondary fs-6">@Model.Status</span>
+    <partial name="_ApplicationStatus" model="Model.Status" />
+</div>
+
+<div class="d-flex flex-wrap gap-2 mb-4">
+    @if (Model.IsManager && Model.Status == RentalApplicationStatus.Submitted)
+    {
+        <button type="button" class="btn btn-primary" data-modal-url="@Url.Action("Create", "Reviews", new { id = Model.Id })">Review application</button>
+    }
+    @if (!Model.IsManager && Model.Status is RentalApplicationStatus.Draft or RentalApplicationStatus.Returned)
+    {
+        <a asp-action="Wizard" asp-route-id="@Model.Id" class="btn btn-primary">Continue application</a>
+    }
+    @if (!Model.IsManager && Model.Status is RentalApplicationStatus.Draft or RentalApplicationStatus.Returned or RentalApplicationStatus.Submitted)
+    {
+        <form asp-action="Withdraw" asp-route-id="@Model.Id" method="post" data-withdraw><button type="submit" class="btn btn-outline-danger">Withdraw</button></form>
+    }
 </div>
 
 @if (!string.IsNullOrWhiteSpace(Model.ReturnComment))
@@ -52,19 +68,18 @@
     <div class="col-12">
         <section class="card shadow-sm">
             <div class="card-body">
-                <h2 class="h5">Applicant information</h2>
                 @if (Model.ApplicantName is null)
                 {
+                    <h2 class="h5">Applicant information</h2>
                     <p class="text-body-secondary mb-0">This information has not been completed yet.</p>
                 }
                 else
                 {
-                    <dl class="row mb-0">
-                        <dt class="col-sm-3">Name</dt><dd class="col-sm-9">@Model.ApplicantName</dd>
-                        <dt class="col-sm-3">Phone</dt><dd class="col-sm-9">@Model.ApplicantPhone</dd>
-                        <dt class="col-sm-3">Email</dt><dd class="col-sm-9">@Model.ApplicantEmail</dd>
-                        <dt class="col-sm-3">Address</dt><dd class="col-sm-9">@Model.CurrentAddress</dd>
-                    </dl>
+                    <partial name="_ApplicantInformation" model="@(new PropertyRental.Web.ViewModels.Applications.ApplicantInformationViewModel
+                    {
+                        Name = Model.ApplicantName, Phone = Model.ApplicantPhone ?? "", Email = Model.ApplicantEmail ?? "",
+                        CurrentAddress = Model.CurrentAddress ?? "", IsReadOnly = true
+                    })" />
                 }
             </div>
         </section>
@@ -101,18 +116,7 @@
         <div class="col-12">
             <section class="card shadow-sm">
                 <div class="card-body">
-                    <h2 class="h5">Status history</h2>
-                    <div class="table-responsive">
-                        <table class="table table-sm mb-0">
-                            <thead><tr><th>Changed</th><th>Transition</th><th>By</th><th>Comment</th></tr></thead>
-                            <tbody>
-                            @foreach (var history in Model.StatusHistory)
-                            {
-                                <tr><td>@history.CreatedAtUtc.ToLocalTime().ToString("g")</td><td>@(history.PreviousStatus?.ToString() ?? "New") to @history.NewStatus</td><td>@history.ChangedBy</td><td>@history.Comment</td></tr>
-                            }
-                            </tbody>
-                        </table>
-                    </div>
+                    <partial name="_StatusHistory" model="Model.StatusHistory" />
                 </div>
             </section>
         </div>
@@ -143,3 +147,7 @@
         </div>
     }
 </div>
+
+@section Scripts {
+    <script src="~/js/applications.js" asp-append-version="true"></script>
+}

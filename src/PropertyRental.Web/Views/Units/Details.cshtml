@@ -17,7 +17,9 @@
                     <dt class="col-sm-4">Bedrooms</dt><dd class="col-sm-8">@Model.Bedrooms</dd>
                     <dt class="col-sm-4">Monthly rent</dt><dd class="col-sm-8">@Model.MonthlyRent.ToString("C")</dd>
                 </dl>
-                <button type="button" class="btn btn-primary" disabled>Create application (coming soon)</button>
+                <form asp-controller="Applications" asp-action="Create" asp-route-unitId="@Model.Id" method="post">
+                    <button type="submit" class="btn btn-primary">Create application</button>
+                </form>
             </div>
         </div>
     </div>

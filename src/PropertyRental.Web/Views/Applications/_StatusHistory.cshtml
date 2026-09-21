@@ -1,0 +1,13 @@
+@model IReadOnlyList<PropertyRental.Web.ViewModels.Applications.StatusHistoryItemViewModel>
+<h2 class="h5">Status history</h2>
+<div class="table-responsive">
+    <table class="table table-sm mb-0">
+        <thead><tr><th>Changed</th><th>Transition</th><th>By</th><th>Outcome</th><th>Comment</th></tr></thead>
+        <tbody>
+        @foreach (var history in Model)
+        {
+            <tr><td>@history.CreatedAtUtc.ToLocalTime().ToString("g")</td><td>@(history.PreviousStatus?.ToString() ?? "New") → @history.NewStatus</td><td>@history.ChangedBy</td><td>@history.ReviewOutcome</td><td>@history.Comment</td></tr>
+        }
+        </tbody>
+    </table>
+</div>

@@ -1,0 +1,49 @@
+@using PropertyRental.Web.Models.Enums
+@model PropertyRental.Web.ViewModels.Applications.ApplicationWizardViewModel
+@{
+    ViewData["Title"] = "Application wizard";
+}
+<a asp-action="Details" asp-route-id="@Model.Id">Back to application</a>
+<h1 class="h2 mt-3">Application #@Model.Id</h1>
+<p>@Model.UnitSummary <partial name="_ApplicationStatus" model="Model.Status" /></p>
+<ol class="wizard-steps list-unstyled d-flex flex-wrap gap-3" aria-label="Application progress">
+    @foreach (var step in Enum.GetValues<ApplicationStep>())
+    {
+        <li class="@(step == Model.CurrentStep ? "fw-bold" : "text-body-secondary")" aria-current="@(step == Model.CurrentStep ? "step" : null)">
+            @(step == ApplicationStep.ApplicantInformation ? "1. Applicant information" : step == ApplicationStep.ResidenceHistory ? "2. Residence history" : "3. Summary")
+        </li>
+    }
+</ol>
+<form asp-action="Wizard" asp-route-id="@Model.Id" method="post" class="card card-body" data-wizard-form>
+    <div asp-validation-summary="ModelOnly" class="text-danger" role="alert"></div>
+    @if (Model.CurrentStep == ApplicationStep.ApplicantInformation)
+    {
+        <partial name="_ApplicantInformation" for="ApplicantInformation" />
+    }
+    else if (Model.CurrentStep == ApplicationStep.ResidenceHistory)
+    {
+        <partial name="_ResidenceHistory" model="Model.ResidenceHistory" />
+    }
+    else
+    {
+        @await Component.InvokeAsync("ApplicationSummary", new { applicationId = Model.Id })
+    }
+    <div class="d-flex justify-content-between gap-2 mt-4">
+        @if (Model.CurrentStep != ApplicationStep.ApplicantInformation)
+        {
+            <button class="btn btn-outline-secondary" type="submit" name="command" value="back" formnovalidate>Back</button>
+        }
+        @if (Model.CurrentStep == ApplicationStep.Summary)
+        {
+            <button class="btn btn-primary ms-auto" type="submit" name="command" value="submit">Submit application</button>
+        }
+        else
+        {
+            <button class="btn btn-primary ms-auto" type="submit" name="command" value="continue">Save and continue</button>
+        }
+    </div>
+</form>
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/applications.js" asp-append-version="true"></script>
+}

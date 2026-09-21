@@ -8,7 +8,7 @@ using PropertyRental.Web.ViewModels.Applications;
 namespace PropertyRental.Web.Controllers;
 
 [Authorize]
-public class ApplicationsController(IApplicationService applicationService) : Controller
+public partial class ApplicationsController(IApplicationService applicationService) : Controller
 {
     public async Task<IActionResult> Index(ApplicationListFilterViewModel filter, CancellationToken cancellationToken)
     {

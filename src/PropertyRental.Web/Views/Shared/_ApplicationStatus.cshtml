@@ -1,0 +1,14 @@
+@using PropertyRental.Web.Models.Enums
+@model RentalApplicationStatus
+@{
+    var color = Model switch
+    {
+        RentalApplicationStatus.Draft => "secondary",
+        RentalApplicationStatus.Submitted => "primary",
+        RentalApplicationStatus.Returned => "warning",
+        RentalApplicationStatus.Approved => "success",
+        RentalApplicationStatus.Denied => "danger",
+        _ => "dark"
+    };
+}
+<span class="badge text-bg-@color">@Model</span>

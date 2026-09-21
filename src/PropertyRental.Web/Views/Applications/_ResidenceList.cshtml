@@ -1,0 +1,29 @@
+@model PropertyRental.Web.ViewModels.Applications.ResidenceHistoryViewModel
+@if (Model.Items.Count == 0)
+{
+    <p class="text-body-secondary" role="status">No residences added.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Address</th><th>Landlord</th><th>Dates</th>@if (Model.IsEditable) { <th>Actions</th> }</tr></thead>
+            <tbody>
+            @foreach (var residence in Model.Items)
+            {
+                <tr>
+                    <td>@residence.Address</td><td>@residence.LandlordName<br />@residence.LandlordPhone</td>
+                    <td>@residence.MoveInDate?.ToString("d") – @residence.MoveOutDate?.ToString("d")</td>
+                    @if (Model.IsEditable)
+                    {
+                        <td class="text-nowrap">
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-modal-url="@Url.Action("EditResidence", new { applicationId = Model.ApplicationId, residenceId = residence.ResidenceId })">Edit</button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" data-modal-url="@Url.Action("ConfirmDeleteResidence", new { applicationId = Model.ApplicationId, residenceId = residence.ResidenceId })">Delete</button>
+                        </td>
+                    }
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}

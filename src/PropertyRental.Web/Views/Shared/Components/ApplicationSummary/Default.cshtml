@@ -1,0 +1,6 @@
+@model PropertyRental.Web.ViewModels.Applications.ApplicationSummaryViewModel
+<h2 class="h4">Review your application</h2>
+<p>Check your saved information before submitting.</p>
+<partial name="~/Views/Applications/_ApplicantInformation.cshtml" model="Model.ApplicantInformation" />
+<h3 class="h5">Residence history</h3>
+<partial name="~/Views/Applications/_ResidenceList.cshtml" model="Model.ResidenceHistory" />

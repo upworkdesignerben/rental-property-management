@@ -10,10 +10,12 @@
         <h1 class="h2 mb-1">@(Model.IsManager ? "Rental applications" : "My applications")</h1>
         <p class="text-body-secondary mb-0">@(Model.IsManager ? "Review applications across your portfolio." : "Track the status of your rental applications.")</p>
     </div>
+    @if (!Model.IsManager)
+    {
+        <a asp-controller="Units" asp-action="Available" class="btn btn-primary">Browse available units</a>
+    }
 </div>
 
-@if (Model.IsManager)
-{
     <form method="get" class="row g-2 align-items-end mb-4">
         <div class="col-sm-6 col-md-4">
             <label for="status" class="form-label">Status</label>
@@ -39,12 +41,11 @@
             <button type="submit" class="btn btn-outline-secondary">Filter</button>
         </div>
     </form>
-}
 
 @if (Model.Applications.Count == 0)
 {
     <div class="alert alert-light border" role="status">
-        @(Model.IsManager ? "No applications match the selected filters." : "You have not started an application yet. Browse available units to get started.")
+        No applications match the selected filters.
     </div>
 }
 else
@@ -74,7 +75,7 @@ else
                     }
                     <td class="fw-semibold">@application.PropertyName</td>
                     <td>@application.UnitNumber</td>
-                    <td><span class="badge text-bg-secondary">@application.Status</span></td>
+                    <td><partial name="_ApplicationStatus" model="application.Status" /></td>
                     <td>@application.UpdatedAtUtc.ToLocalTime().ToString("g")</td>
                     <td class="text-end"><a asp-action="Details" asp-route-id="@application.Id" class="btn btn-sm btn-outline-primary">View</a></td>
                 </tr>
