@@ -26,7 +26,7 @@ else
                     <dl class="row small mb-4">
                         <dt class="col-6">Type</dt><dd class="col-6">@unit.UnitTypeName</dd>
                         <dt class="col-6">Bedrooms</dt><dd class="col-6">@unit.Bedrooms</dd>
-                        <dt class="col-6">Monthly rent</dt><dd class="col-6">@unit.MonthlyRent.ToString("C")</dd>
+                        <dt class="col-6">Monthly rent</dt><dd class="col-6">@($"₴{unit.MonthlyRent:N2}")</dd>
                     </dl>
                     <a asp-action="Details" asp-route-id="@unit.Id" class="btn btn-outline-primary mt-auto">View details</a>
                 </div>

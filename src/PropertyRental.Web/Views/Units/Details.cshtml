@@ -15,7 +15,7 @@
                 <dl class="row mb-4">
                     <dt class="col-sm-4">Unit type</dt><dd class="col-sm-8">@Model.UnitTypeName</dd>
                     <dt class="col-sm-4">Bedrooms</dt><dd class="col-sm-8">@Model.Bedrooms</dd>
-                    <dt class="col-sm-4">Monthly rent</dt><dd class="col-sm-8">@Model.MonthlyRent.ToString("C")</dd>
+                    <dt class="col-sm-4">Monthly rent</dt><dd class="col-sm-8">@($"₴{Model.MonthlyRent:N2}")</dd>
                 </dl>
                 <form asp-controller="Applications" asp-action="Create" asp-route-unitId="@Model.Id" method="post">
                     <button type="submit" class="btn btn-primary">Create application</button>

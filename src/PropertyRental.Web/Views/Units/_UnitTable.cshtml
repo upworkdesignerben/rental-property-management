@@ -27,7 +27,7 @@ else
                     <td>@unit.UnitNumber</td>
                     <td>@unit.UnitTypeName</td>
                     <td>@unit.Bedrooms</td>
-                    <td>@unit.MonthlyRent.ToString("C")</td>
+                    <td>@($"₴{unit.MonthlyRent:N2}")</td>
                     <td>
                         @if (unit.IsAvailable)
                         {

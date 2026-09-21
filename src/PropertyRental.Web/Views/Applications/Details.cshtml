@@ -44,7 +44,7 @@
                     <dt class="col-sm-5">Address</dt><dd class="col-sm-7">@Model.PropertyAddress</dd>
                     <dt class="col-sm-5">Unit</dt><dd class="col-sm-7">@Model.UnitNumber (@Model.UnitTypeName)</dd>
                     <dt class="col-sm-5">Bedrooms</dt><dd class="col-sm-7">@Model.Bedrooms</dd>
-                    <dt class="col-sm-5">Monthly rent</dt><dd class="col-sm-7">@Model.MonthlyRent.ToString("C")</dd>
+                    <dt class="col-sm-5">Monthly rent</dt><dd class="col-sm-7">@($"₴{Model.MonthlyRent:N2}")</dd>
                 </dl>
             </div>
         </section>
