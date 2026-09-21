@@ -26,6 +26,8 @@ public class UnitsController(IUnitService unitService) : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(UnitFormViewModel model, CancellationToken cancellationToken)
     {
+        model = model with { Id = null };
+        ModelState.Remove(nameof(model.Id));
         if (!ModelState.IsValid)
         {
             return await InvalidFormAsync(model, cancellationToken);

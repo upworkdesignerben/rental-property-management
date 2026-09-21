@@ -46,7 +46,7 @@ public class UnitService(ApplicationDbContext dbContext, TimeProvider timeProvid
         var today = Today;
         var units = await dbContext.Units
             .AsNoTracking()
-            .Where(unit => !unit.Leases.Any(lease => lease.StartDate <= today && lease.EndDate >= today))
+            .Where(UnitRules.AvailableOn(today))
             .OrderBy(unit => unit.Property.Name)
             .ThenBy(unit => unit.UnitNumber)
             .Select(unit => new UnitListItemViewModel
@@ -89,9 +89,12 @@ public class UnitService(ApplicationDbContext dbContext, TimeProvider timeProvid
 
     public async Task<UnitFormViewModel> PopulateOptionsAsync(UnitFormViewModel model, CancellationToken cancellationToken = default)
     {
+        var currentTypeId = model.Id.HasValue
+            ? await dbContext.Units.Where(unit => unit.Id == model.Id).Select(unit => (int?)unit.UnitTypeId).SingleOrDefaultAsync(cancellationToken)
+            : null;
         var unitTypes = await dbContext.UnitTypes
             .AsNoTracking()
-            .Where(unitType => unitType.IsActive || unitType.Id == model.UnitTypeId)
+            .Where(unitType => unitType.IsActive || unitType.Id == currentTypeId)
             .OrderBy(unitType => unitType.Name)
             .Select(unitType => new UnitOptionViewModel(unitType.Id, unitType.Name))
             .ToListAsync(cancellationToken);
@@ -176,7 +179,8 @@ public class UnitService(ApplicationDbContext dbContext, TimeProvider timeProvid
         var today = Today;
         return await dbContext.Units
             .AsNoTracking()
-            .Where(unit => unit.Id == id && !unit.Leases.Any(lease => lease.StartDate <= today && lease.EndDate >= today))
+            .Where(unit => unit.Id == id)
+            .Where(UnitRules.AvailableOn(today))
             .Select(unit => new UnitDetailsViewModel
             {
                 Id = unit.Id,
@@ -191,9 +195,7 @@ public class UnitService(ApplicationDbContext dbContext, TimeProvider timeProvid
     }
 
     public Task<bool> IsAvailableAsync(int unitId, DateOnly date, CancellationToken cancellationToken = default) =>
-        dbContext.Units.AnyAsync(
-            unit => unit.Id == unitId && !unit.Leases.Any(lease => lease.StartDate <= date && lease.EndDate >= date),
-            cancellationToken);
+        dbContext.Units.Where(UnitRules.AvailableOn(date)).AnyAsync(unit => unit.Id == unitId, cancellationToken);
 
     private DateOnly Today => DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
 
@@ -221,7 +223,7 @@ public class UnitService(ApplicationDbContext dbContext, TimeProvider timeProvid
             return "The selected unit type no longer exists.";
         }
 
-        if (!unitType.IsActive && unitType.Id != currentUnitTypeId)
+        if (!UnitRules.CanAssignType(unitType, currentUnitTypeId))
         {
             return "Only active unit types can be selected.";
         }
