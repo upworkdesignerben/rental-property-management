@@ -6,7 +6,7 @@ using PropertyRental.Web.ViewModels.Applications;
 
 namespace PropertyRental.Web.Services;
 
-public class ApplicationService(ApplicationDbContext dbContext) : IApplicationService
+public partial class ApplicationService(ApplicationDbContext dbContext, TimeProvider timeProvider, IUnitService unitService) : IApplicationService
 {
     public async Task<ApplicationListViewModel> GetListAsync(
         string userId,
@@ -19,6 +19,10 @@ public class ApplicationService(ApplicationDbContext dbContext) : IApplicationSe
         {
             applications = applications.Where(application => application.ApplicantId == userId);
         }
+
+        var propertyOptions = isManager
+            ? dbContext.Properties.AsNoTracking()
+            : applications.Select(application => application.Unit.Property).Distinct();
 
         if (filter.Status.HasValue)
         {
@@ -49,11 +53,9 @@ public class ApplicationService(ApplicationDbContext dbContext) : IApplicationSe
             IsManager = isManager,
             Filter = filter,
             Applications = items,
-            Properties = isManager
-                ? await dbContext.Properties.AsNoTracking().OrderBy(property => property.Name)
+            Properties = await propertyOptions.OrderBy(property => property.Name)
                     .Select(property => new ApplicationPropertyOptionViewModel(property.Id, property.Name))
                     .ToListAsync(cancellationToken)
-                : []
         };
     }
 
@@ -104,16 +106,17 @@ public class ApplicationService(ApplicationDbContext dbContext) : IApplicationSe
                         MoveInDate = residence.MoveInDate,
                         MoveOutDate = residence.MoveOutDate
                     }).ToList(),
-                StatusHistory = application.StatusHistory.OrderByDescending(history => history.CreatedAtUtc)
+                StatusHistory = application.StatusHistory.Where(history => isManager).OrderBy(history => history.CreatedAtUtc).ThenBy(history => history.Id)
                     .Select(history => new StatusHistoryItemViewModel
                     {
                         PreviousStatus = history.PreviousStatus,
                         NewStatus = history.NewStatus,
                         ChangedBy = history.ChangedByUser.Email!,
                         Comment = history.Comment,
+                        ReviewOutcome = history.ReviewOutcome,
                         CreatedAtUtc = history.CreatedAtUtc
                     }).ToList(),
-                Reviews = application.Reviews.OrderByDescending(review => review.CreatedAtUtc)
+                Reviews = application.Reviews.Where(review => isManager).OrderByDescending(review => review.CreatedAtUtc)
                     .Select(review => new ReviewItemViewModel
                     {
                         Outcome = review.Outcome.ToString(),
@@ -123,12 +126,6 @@ public class ApplicationService(ApplicationDbContext dbContext) : IApplicationSe
                     }).ToList()
             })
             .SingleOrDefaultAsync(cancellationToken);
-
-        if (model is not null && !isManager)
-        {
-            model.StatusHistory = [];
-            model.Reviews = [];
-        }
 
         return model;
     }

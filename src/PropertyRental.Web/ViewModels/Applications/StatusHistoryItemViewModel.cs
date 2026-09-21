@@ -12,5 +12,7 @@ public class StatusHistoryItemViewModel
 
     public string? Comment { get; init; }
 
+    public ReviewOutcome? ReviewOutcome { get; init; }
+
     public DateTime CreatedAtUtc { get; init; }
 }

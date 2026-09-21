@@ -2,7 +2,7 @@ using PropertyRental.Web.ViewModels.Applications;
 
 namespace PropertyRental.Web.Services.Interfaces;
 
-public interface IApplicationService
+public partial interface IApplicationService
 {
     Task<ApplicationListViewModel> GetListAsync(
         string userId,

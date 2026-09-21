@@ -1,0 +1,122 @@
+using System.Data;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
+using PropertyRental.Web.Models;
+using PropertyRental.Web.Models.Enums;
+using PropertyRental.Web.Services.Interfaces;
+using PropertyRental.Web.ViewModels.Applications;
+using PropertyRental.Web.ViewModels.Reviews;
+
+namespace PropertyRental.Web.Services;
+
+public partial class ApplicationService
+{
+    private readonly ApplicationWorkflow workflow = new(timeProvider);
+    private DateTime Now => timeProvider.GetUtcNow().UtcDateTime;
+    private DateOnly Today => DateOnly.FromDateTime(Now);
+
+    private IQueryable<RentalApplication> Owned(int id, string userId) => dbContext.RentalApplications
+        .Where(a => a.Id == id && a.ApplicantId == userId);
+
+    public async Task<ApplicationWizardViewModel?> GetWizardAsync(int id, string userId, CancellationToken ct = default)
+    {
+        var a = await Owned(id, userId).AsNoTracking().Include(a => a.Unit).ThenInclude(u => u.Property)
+            .Include(a => a.ApplicantInformation).Include(a => a.Residences).SingleOrDefaultAsync(ct);
+        if (a is null) return null;
+        return new ApplicationWizardViewModel
+        {
+            Id = a.Id, Status = a.Status, CurrentStep = a.CurrentStep,
+            UnitSummary = $"{a.Unit.Property.Name} / Unit {a.Unit.UnitNumber}",
+            ApplicantInformationSaved = a.ApplicantInformationSaved, ResidenceHistorySaved = a.ResidenceHistorySaved,
+            ApplicantInformation = ApplicationWorkflow.Information(a.ApplicantInformation),
+            ResidenceHistory = new ResidenceHistoryViewModel
+            {
+                ApplicationId = a.Id, IsEditable = ApplicationWorkflow.IsEditable(a.Status),
+                Items = a.Residences.OrderByDescending(r => r.MoveOutDate).ThenBy(r => r.Id).Select(r => new ResidenceFormViewModel
+                {
+                    ApplicationId = a.Id, ResidenceId = r.Id, Address = r.Address,
+                    LandlordName = r.LandlordName, LandlordPhone = r.LandlordPhone,
+                    MoveInDate = r.MoveInDate, MoveOutDate = r.MoveOutDate
+                }).ToList()
+            }
+        };
+    }
+
+    // Serializable protects the lease range, including when no lease exists yet.
+    // Availability and all workflow mutations commit together or roll back together.
+    private async Task<ApplicationMutationResult> MutateAsync(Func<Task<ApplicationMutationResult>> operation, CancellationToken ct)
+    {
+        try
+        {
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            var result = await operation();
+            if (!result.Succeeded)
+            {
+                dbContext.ChangeTracker.Clear();
+                return result;
+            }
+            await dbContext.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            return result;
+        }
+        catch (DbUpdateException)
+        {
+            dbContext.ChangeTracker.Clear();
+            return new(409, Message: "The application changed or could not be saved. Reload and try again.");
+        }
+        catch (Exception ex) when (IsSqlConflict(ex))
+        {
+            dbContext.ChangeTracker.Clear();
+            return new(409, Message: "Another operation is in progress. Reload and try again.");
+        }
+    }
+
+    private static bool IsSqlConflict(Exception exception)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+            if (current is SqlException sql && sql.Number is 1205 or 1222 or 2601 or 2627) return true;
+        return false;
+    }
+
+    public Task<ApplicationMutationResult> CreateDraftAsync(int unitId, string userId, CancellationToken ct = default) => MutateAsync(async () =>
+    {
+        if (!await unitService.IsAvailableAsync(unitId, Today, ct)) return new(409, Message: "This unit is no longer available.");
+        var a = new RentalApplication
+        {
+            ApplicantId = userId, UnitId = unitId, Status = RentalApplicationStatus.Draft,
+            CurrentStep = ApplicationStep.ApplicantInformation, CreatedAtUtc = Now, UpdatedAtUtc = Now
+        };
+        a.StatusHistory.Add(new ApplicationStatusHistory { NewStatus = a.Status, ChangedByUserId = userId, CreatedAtUtc = Now });
+        dbContext.RentalApplications.Add(a);
+        await dbContext.SaveChangesAsync(ct);
+        return new(Id: a.Id);
+    }, ct);
+
+    public Task<ApplicationMutationResult> WizardAsync(int id, string userId, string command, ApplicantInformationViewModel information, CancellationToken ct = default) => MutateAsync(async () =>
+    {
+        var a = await Owned(id, userId).Include(a => a.ApplicantInformation).Include(a => a.Residences).SingleOrDefaultAsync(ct);
+        if (a is null) return new(404);
+        var available = command != "submit" || await unitService.IsAvailableAsync(a.UnitId, Today, ct);
+        return workflow.Wizard(a, userId, command, information, available);
+    }, ct);
+
+    public Task<ApplicationMutationResult> WithdrawAsync(int id, string userId, CancellationToken ct = default) => MutateAsync(async () =>
+    {
+        var a = await Owned(id, userId).SingleOrDefaultAsync(ct);
+        return a is null ? new(404) : workflow.Withdraw(a, userId);
+    }, ct);
+
+    public Task<ApplicationMutationResult> SaveResidenceAsync(int applicationId, int? residenceId, string userId, ResidenceFormViewModel model, bool delete = false, CancellationToken ct = default) => MutateAsync(async () =>
+    {
+        var a = await Owned(applicationId, userId).Include(a => a.Residences).SingleOrDefaultAsync(ct);
+        return a is null ? new(404) : workflow.SaveResidence(a, residenceId, userId, model, delete);
+    }, ct);
+
+    public Task<ApplicationMutationResult> ReviewAsync(int id, string managerId, ApplicationReviewViewModel model, CancellationToken ct = default) => MutateAsync(async () =>
+    {
+        var a = await dbContext.RentalApplications.Include(a => a.Lease).SingleOrDefaultAsync(a => a.Id == id, ct);
+        if (a is null) return new(404);
+        var available = model.Outcome != ReviewOutcome.Approved || await unitService.IsAvailableAsync(a.UnitId, Today, ct);
+        return workflow.Review(a, managerId, model, available);
+    }, ct);
+}
