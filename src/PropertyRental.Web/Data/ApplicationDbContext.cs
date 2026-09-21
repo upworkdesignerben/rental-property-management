@@ -24,6 +24,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ApplicationStatusHistory> ApplicationStatusHistories => Set<ApplicationStatusHistory>();
 
     public DbSet<Lease> Leases => Set<Lease>();
+    public DbSet<SeedHistory> SeedHistory => Set<SeedHistory>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

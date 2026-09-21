@@ -24,10 +24,23 @@ public static class DbInitializer
         var dbContext = serviceProvider.GetRequiredService<ApplicationDbContext>();
         var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
+        const string seedName = "DemoData-v1";
+        if (await dbContext.SeedHistory.AnyAsync(seed => seed.Name == seedName, cancellationToken)) return;
+        // Adopt databases seeded before seed checkpoints were introduced without restoring
+        // deleted residences or creating new applications for statuses users have changed.
+        if (await dbContext.RentalApplications.AnyAsync(cancellationToken))
+        {
+            dbContext.SeedHistory.Add(new SeedHistory { Name = seedName, AppliedAtUtc = DateTime.UtcNow });
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return;
+        }
+
         var manager = await EnsureUserAsync(userManager, DemoManagerEmail, RoleNames.PropertyManager);
         var applicant = await EnsureUserAsync(userManager, DemoApplicantEmail, RoleNames.Applicant);
 
-        var now = DateTime.UtcNow;
+        var now = serviceProvider.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime;
         var today = DateOnly.FromDateTime(now);
         Randomizer.Seed = new Random(2_026_091_8);
         var faker = new Faker("en");
@@ -175,7 +188,9 @@ public static class DbInitializer
                 CreatedAtUtc = now
             });
         }
+        dbContext.SeedHistory.Add(new SeedHistory { Name = seedName, AppliedAtUtc = now });
         await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     private static Unit CreateUnit(
@@ -243,6 +258,18 @@ public static class DbInitializer
         if (application.Status == RentalApplicationStatus.Draft)
         {
             return;
+        }
+
+        if (application.Status != RentalApplicationStatus.Submitted)
+        {
+            dbContext.ApplicationStatusHistories.Add(new ApplicationStatusHistory
+            {
+                RentalApplicationId = application.Id,
+                PreviousStatus = RentalApplicationStatus.Draft,
+                NewStatus = RentalApplicationStatus.Submitted,
+                ChangedByUserId = applicantId,
+                CreatedAtUtc = application.SubmittedAtUtc!.Value
+            });
         }
 
         var changedByUserId = application.Status switch
