@@ -44,7 +44,7 @@ public partial class ApplicationService
 
     // Serializable protects the lease range, including when no lease exists yet.
     // Availability and all workflow mutations commit together or roll back together.
-    private async Task<ApplicationMutationResult> MutateAsync(Func<Task<ApplicationMutationResult>> operation, CancellationToken ct)
+    private async Task<ApplicationMutationResult> TransactAsync(Func<Task<ApplicationMutationResult>> operation, CancellationToken ct)
     {
         try
         {
@@ -78,45 +78,71 @@ public partial class ApplicationService
         return false;
     }
 
-    public Task<ApplicationMutationResult> CreateDraftAsync(int unitId, string userId, CancellationToken ct = default) => MutateAsync(async () =>
+    public Task<ApplicationMutationResult> CreateDraftAsync(int unitId, string userId, CancellationToken ct = default) =>
+        TransactAsync(() => CreateDraftCoreAsync(unitId, userId, ct), ct);
+
+    private async Task<ApplicationMutationResult> CreateDraftCoreAsync(int unitId, string userId, CancellationToken ct)
     {
         if (!await unitService.IsAvailableAsync(unitId, Today, ct)) return new(409, Message: "This unit is no longer available.");
-        var a = new RentalApplication
+        var application = new RentalApplication
         {
             ApplicantId = userId, UnitId = unitId, Status = RentalApplicationStatus.Draft,
             CurrentStep = ApplicationStep.ApplicantInformation, CreatedAtUtc = Now, UpdatedAtUtc = Now
         };
-        a.StatusHistory.Add(new ApplicationStatusHistory { NewStatus = a.Status, ChangedByUserId = userId, CreatedAtUtc = Now });
-        dbContext.RentalApplications.Add(a);
+        application.StatusHistory.Add(new ApplicationStatusHistory { NewStatus = application.Status, ChangedByUserId = userId, CreatedAtUtc = Now });
+        dbContext.RentalApplications.Add(application);
         await dbContext.SaveChangesAsync(ct);
-        return new(Id: a.Id);
-    }, ct);
+        return new(Id: application.Id);
+    }
 
-    public Task<ApplicationMutationResult> WizardAsync(int id, string userId, string command, ApplicantInformationViewModel information, CancellationToken ct = default) => MutateAsync(async () =>
-    {
-        var a = await Owned(id, userId).Include(a => a.ApplicantInformation).Include(a => a.Residences).SingleOrDefaultAsync(ct);
-        if (a is null) return new(404);
-        var available = command != "submit" || await unitService.IsAvailableAsync(a.UnitId, Today, ct);
-        return workflow.Wizard(a, userId, command, information, available);
-    }, ct);
+    public Task<ApplicationMutationResult> WizardAsync(int id, string userId, WizardCommand command, ApplicantInformationViewModel information, CancellationToken ct = default) =>
+        TransactAsync(() => ApplyWizardCommandAsync(id, userId, command, information, ct), ct);
 
-    public Task<ApplicationMutationResult> WithdrawAsync(int id, string userId, CancellationToken ct = default) => MutateAsync(async () =>
+    private async Task<ApplicationMutationResult> ApplyWizardCommandAsync(int id, string userId, WizardCommand command, ApplicantInformationViewModel information, CancellationToken ct)
     {
-        var a = await Owned(id, userId).SingleOrDefaultAsync(ct);
-        return a is null ? new(404) : workflow.Withdraw(a, userId);
-    }, ct);
+        var application = await Owned(id, userId)
+            .Include(application => application.ApplicantInformation)
+            .Include(application => application.Residences)
+            .SingleOrDefaultAsync(ct);
+        if (application is null) return new(404);
+        // Availability is rechecked only for Submit; Back and Continue do not need it.
+        var unitAvailable = command != WizardCommand.Submit
+            || await unitService.IsAvailableAsync(application.UnitId, Today, ct);
+        return workflow.Wizard(application, userId, command, information, unitAvailable);
+    }
 
-    public Task<ApplicationMutationResult> SaveResidenceAsync(int applicationId, int? residenceId, string userId, ResidenceFormViewModel model, bool delete = false, CancellationToken ct = default) => MutateAsync(async () =>
-    {
-        var a = await Owned(applicationId, userId).Include(a => a.Residences).SingleOrDefaultAsync(ct);
-        return a is null ? new(404) : workflow.SaveResidence(a, residenceId, userId, model, delete);
-    }, ct);
+    public Task<ApplicationMutationResult> WithdrawAsync(int id, string userId, CancellationToken ct = default) =>
+        TransactAsync(() => WithdrawCoreAsync(id, userId, ct), ct);
 
-    public Task<ApplicationMutationResult> ReviewAsync(int id, string managerId, ApplicationReviewViewModel model, CancellationToken ct = default) => MutateAsync(async () =>
+    private async Task<ApplicationMutationResult> WithdrawCoreAsync(int id, string userId, CancellationToken ct)
     {
-        var a = await dbContext.RentalApplications.Include(a => a.Lease).SingleOrDefaultAsync(a => a.Id == id, ct);
-        if (a is null) return new(404);
-        var available = model.Outcome != ReviewOutcome.Approved || await unitService.IsAvailableAsync(a.UnitId, Today, ct);
-        return workflow.Review(a, managerId, model, available);
-    }, ct);
+        var application = await Owned(id, userId).SingleOrDefaultAsync(ct);
+        return application is null ? new(404) : workflow.Withdraw(application, userId);
+    }
+
+    public Task<ApplicationMutationResult> SaveResidenceAsync(int applicationId, int? residenceId, string userId, ResidenceFormViewModel model, bool delete = false, CancellationToken ct = default) =>
+        TransactAsync(() => SaveResidenceCoreAsync(applicationId, residenceId, userId, model, delete, ct), ct);
+
+    private async Task<ApplicationMutationResult> SaveResidenceCoreAsync(int applicationId, int? residenceId, string userId, ResidenceFormViewModel model, bool delete, CancellationToken ct)
+    {
+        var application = await Owned(applicationId, userId)
+            .Include(application => application.Residences)
+            .SingleOrDefaultAsync(ct);
+        return application is null ? new(404) : workflow.SaveResidence(application, residenceId, userId, model, delete);
+    }
+
+    public Task<ApplicationMutationResult> ReviewAsync(int id, string managerId, ApplicationReviewViewModel model, CancellationToken ct = default) =>
+        TransactAsync(() => ReviewCoreAsync(id, managerId, model, ct), ct);
+
+    private async Task<ApplicationMutationResult> ReviewCoreAsync(int id, string managerId, ApplicationReviewViewModel model, CancellationToken ct)
+    {
+        var application = await dbContext.RentalApplications
+            .Include(application => application.Lease)
+            .SingleOrDefaultAsync(application => application.Id == id, ct);
+        if (application is null) return new(404);
+        // Availability is rechecked only for Approve; Return and Deny do not need it.
+        var unitAvailable = model.Outcome != ReviewOutcome.Approved
+            || await unitService.IsAvailableAsync(application.UnitId, Today, ct);
+        return workflow.Review(application, managerId, model, unitAvailable);
+    }
 }

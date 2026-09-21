@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+
+using PropertyRental.Web.Models.Enums;
 using PropertyRental.Web.Security;
 using PropertyRental.Web.Services.Interfaces;
 using PropertyRental.Web.ViewModels.Applications;
@@ -32,14 +34,15 @@ public partial class ApplicationsController
     public async Task<IActionResult> Wizard(int id, string? command,
         [Bind("Name,Phone,Email,CurrentAddress", Prefix = "ApplicantInformation")] ApplicantInformationViewModel information, CancellationToken ct)
     {
-        command = command?.Trim().ToLowerInvariant();
+        if (!Enum.TryParse(command?.Trim(), ignoreCase: true, out WizardCommand parsedCommand))
+            return BadRequest("The requested wizard action is not supported.");
         // Only the persisted current section is validated by the service; Back discards posted inputs.
         ModelState.Clear();
-        var result = await applicationService.WizardAsync(id, ApplicantId, command ?? "", information, ct);
+        var result = await applicationService.WizardAsync(id, ApplicantId, parsedCommand, information, ct);
         if (result.StatusCode == 404) return NotFound();
         if (result.Succeeded)
         {
-            if (command == "submit")
+            if (parsedCommand == WizardCommand.Submit)
             {
                 TempData["Success"] = "Your application was submitted for review.";
                 return RedirectToAction(nameof(Details), new { id });
@@ -53,7 +56,7 @@ public partial class ApplicationsController
             TempData["Error"] = result.Message;
             return RedirectToAction(nameof(Details), new { id });
         }
-        if (command == "continue" && model.CurrentStep == Models.Enums.ApplicationStep.ApplicantInformation)
+        if (parsedCommand == WizardCommand.Continue && model.CurrentStep == ApplicationStep.ApplicantInformation)
             model.ApplicantInformation = information;
         AddErrors(result);
         Response.StatusCode = result.StatusCode;

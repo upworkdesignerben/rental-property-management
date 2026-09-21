@@ -19,7 +19,7 @@ public class ApplicationWorkflowTests
     public void Submit_saved_summary_records_transition_and_timestamp(RentalApplicationStatus status)
     {
         var a = Ready(status);
-        var result = workflow.Wizard(a, Applicant, "submit", new(), true);
+        var result = workflow.Wizard(a, Applicant, WizardCommand.Submit, new(), true);
         Assert.True(result.Succeeded);
         Assert.Equal(RentalApplicationStatus.Submitted, a.Status);
         Assert.Equal(Now.UtcDateTime, a.SubmittedAtUtc);
@@ -36,7 +36,7 @@ public class ApplicationWorkflowTests
     public void Submit_with_active_lease_does_not_change_application()
     {
         var a = Ready();
-        var result = workflow.Wizard(a, Applicant, "submit", new(), false);
+        var result = workflow.Wizard(a, Applicant, WizardCommand.Submit, new(), false);
         Assert.Equal(409, result.StatusCode);
         Assert.Equal(RentalApplicationStatus.Draft, a.Status);
         Assert.Null(a.SubmittedAtUtc);
@@ -56,7 +56,7 @@ public class ApplicationWorkflowTests
         a.CurrentStep = step;
         a.ApplicantInformationSaved = info;
         a.ResidenceHistorySaved = residences;
-        Assert.Equal(409, workflow.Wizard(a, Applicant, "submit", new(), true).StatusCode);
+        Assert.Equal(409, workflow.Wizard(a, Applicant, WizardCommand.Submit, new(), true).StatusCode);
         Assert.Equal(RentalApplicationStatus.Draft, a.Status);
         Assert.Empty(a.StatusHistory);
     }
@@ -69,7 +69,7 @@ public class ApplicationWorkflowTests
         var a = Ready();
         if (invalidInformation) a.ApplicantInformation!.Email = "not-an-email";
         else a.Residences.Add(new Residence { Address = "Old address", LandlordName = "Landlord", LandlordPhone = "1234567890", MoveInDate = new(2025, 1, 1), MoveOutDate = new(2024, 1, 1) });
-        Assert.Equal(409, workflow.Wizard(a, Applicant, "submit", new(), true).StatusCode);
+        Assert.Equal(409, workflow.Wizard(a, Applicant, WizardCommand.Submit, new(), true).StatusCode);
         Assert.Empty(a.StatusHistory);
     }
 
@@ -83,12 +83,12 @@ public class ApplicationWorkflowTests
         a.ApplicantInformationSaved = false;
         var input = ValidInformation();
         input.Name = " New name ";
-        Assert.True(workflow.Wizard(a, Applicant, "continue", input, false).Succeeded);
+        Assert.True(workflow.Wizard(a, Applicant, WizardCommand.Continue, input, false).Succeeded);
         Assert.Equal("New name", a.ApplicantInformation!.Name);
         Assert.True(a.ApplicantInformationSaved);
         Assert.Equal(ApplicationStep.ResidenceHistory, a.CurrentStep);
         // Information posted while continuing Residence History must be ignored.
-        Assert.True(workflow.Wizard(a, Applicant, "continue", new(), false).Succeeded);
+        Assert.True(workflow.Wizard(a, Applicant, WizardCommand.Continue, new(), false).Succeeded);
         Assert.Equal("New name", a.ApplicantInformation.Name);
         Assert.Equal(ApplicationStep.Summary, a.CurrentStep);
         Assert.True(a.ResidenceHistorySaved);
@@ -99,7 +99,7 @@ public class ApplicationWorkflowTests
     {
         var a = Ready();
         a.CurrentStep = ApplicationStep.ApplicantInformation;
-        var result = workflow.Wizard(a, Applicant, "continue", new(), true);
+        var result = workflow.Wizard(a, Applicant, WizardCommand.Continue, new(), true);
         Assert.Equal(400, result.StatusCode);
         Assert.Contains("ApplicantInformation.Name", result.Errors!.Keys);
         Assert.Equal("Original name", a.ApplicantInformation!.Name);
@@ -114,19 +114,19 @@ public class ApplicationWorkflowTests
     {
         var a = Ready();
         a.CurrentStep = start;
-        Assert.True(workflow.Wizard(a, Applicant, "back", new(), true).Succeeded);
+        Assert.True(workflow.Wizard(a, Applicant, WizardCommand.Back, new(), true).Succeeded);
         Assert.Equal(expected, a.CurrentStep);
         Assert.Equal("Original name", a.ApplicantInformation!.Name);
     }
 
-    [Theory]
-    [InlineData("approve")]
-    [InlineData("")]
-    [InlineData("continue")]
-    public void Unknown_or_wrong_step_commands_are_rejected(string command)
+    [Fact]
+    public void Continue_on_summary_step_is_rejected()
     {
+        // Unknown command strings never reach the workflow: the controller
+        // rejects them with 400 before calling the service.
         var a = Ready();
-        Assert.Equal(400, workflow.Wizard(a, Applicant, command, ValidInformation(), true).StatusCode);
+        Assert.Equal(ApplicationStep.Summary, a.CurrentStep);
+        Assert.Equal(400, workflow.Wizard(a, Applicant, WizardCommand.Continue, ValidInformation(), true).StatusCode);
         Assert.Equal(ApplicationStep.Summary, a.CurrentStep);
         Assert.Empty(a.StatusHistory);
     }
@@ -139,7 +139,7 @@ public class ApplicationWorkflowTests
     public void Read_only_states_reject_all_applicant_mutations(RentalApplicationStatus status)
     {
         var a = Ready(status);
-        foreach (var command in new[] { "back", "continue", "submit" })
+        foreach (var command in new[] { WizardCommand.Back, WizardCommand.Continue, WizardCommand.Submit })
             Assert.Equal(409, workflow.Wizard(a, Applicant, command, ValidInformation(), true).StatusCode);
         Assert.Equal(409, workflow.SaveResidence(a, null, Applicant, ValidResidence(), false).StatusCode);
         Assert.Equal(409, workflow.SaveResidence(a, 1, Applicant, new(), true).StatusCode);
@@ -152,7 +152,7 @@ public class ApplicationWorkflowTests
     public void Foreign_applicant_cannot_mutate_application()
     {
         var a = Ready();
-        Assert.Equal(404, workflow.Wizard(a, "other", "submit", new(), true).StatusCode);
+        Assert.Equal(404, workflow.Wizard(a, "other", WizardCommand.Submit, new(), true).StatusCode);
         Assert.Equal(404, workflow.Withdraw(a, "other").StatusCode);
         Assert.Equal(404, workflow.SaveResidence(a, null, "other", ValidResidence(), false).StatusCode);
         Assert.Empty(a.StatusHistory);
@@ -278,9 +278,9 @@ public class ApplicationWorkflowTests
         Assert.True(workflow.Review(a, Manager, new() { Outcome = ReviewOutcome.Returned, Comment = "Fix address" }, true).Succeeded);
         var input = ValidInformation();
         input.CurrentAddress = "Corrected address";
-        Assert.True(workflow.Wizard(a, Applicant, "continue", input, true).Succeeded);
-        Assert.True(workflow.Wizard(a, Applicant, "continue", new(), true).Succeeded);
-        Assert.True(workflow.Wizard(a, Applicant, "submit", new(), true).Succeeded);
+        Assert.True(workflow.Wizard(a, Applicant, WizardCommand.Continue, input, true).Succeeded);
+        Assert.True(workflow.Wizard(a, Applicant, WizardCommand.Continue, new(), true).Succeeded);
+        Assert.True(workflow.Wizard(a, Applicant, WizardCommand.Submit, new(), true).Succeeded);
         Assert.Equal("Corrected address", a.ApplicantInformation!.CurrentAddress);
         Assert.Equal(new[] { RentalApplicationStatus.Returned, RentalApplicationStatus.Submitted }, a.StatusHistory.Select(h => h.NewStatus));
         Assert.Single(a.Reviews);
